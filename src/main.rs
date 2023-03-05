@@ -23,8 +23,9 @@ fn main() {
 
 #[derive(Debug, Deserialize)]
 struct Records {
-    #[serde(deserialize_with = "deserialize_max")]
-    locations: Vec<Location>,
+    #[serde(deserialize_with = "deserialize_locations")]
+    #[serde(rename(deserialize = "locations"))]
+    _locations: (),
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,14 +37,14 @@ struct Location {
     timestamp: String,
 }
 
-fn deserialize_max<'de, D>(deserializer: D) -> Result<Vec<Location>, D::Error>
+fn deserialize_locations<'de, D>(deserializer: D) -> Result<(), D::Error>
 where
     D: Deserializer<'de>,
 {
     struct LocVisitor;
 
     impl<'de> Visitor<'de> for LocVisitor {
-        type Value = Vec<Location>;
+        type Value = (); // TODO: Vec<Path> を返すといいかもしれない
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("a nonempty sequence of numbers")
@@ -55,15 +56,9 @@ where
         {
             let mut done = HashSet::new();
             let mut current: Option<(String, BufWriter<File>)> = None;
-            // let mut cur_year = "2013".to_string();
-            // let mut writer = new_file(&cur_year);
 
-            let mut result = Vec::new();
             while let Some(l) = seq.next_element::<Location>()? {
                 let year_month = &l.timestamp[..7];
-                if !year_month.starts_with("2013") && !year_month.starts_with("2014") {
-                    continue;
-                }
 
                 current = match current {
                     None => {
@@ -103,11 +98,6 @@ where
                         // writeln!(&mut writer, "{}\t{},{}", l.timestamp, l.longitude_e7 as f64 / 10000000.0, l.latitude_e7 as f64 / 10000000.0).unwrap();
                     }
                 };
-
-                if result.len() >= 1000 {
-                    continue;
-                }
-                result.push(l);
             }
 
             match current {
@@ -115,7 +105,7 @@ where
                 Some((_, writer)) => end_file(writer),
             };
 
-            Ok(result)
+            Ok(())
         }
     }
 

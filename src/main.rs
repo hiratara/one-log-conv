@@ -1,4 +1,4 @@
-use std::{cmp, fmt, fs::File, io::{BufReader, BufWriter, Write}, marker::PhantomData};
+use std::{cmp, fmt, fs::File, io::{BufReader, BufWriter, Write}, marker::PhantomData, collections::HashSet};
 
 use serde::{
     de::{self, SeqAccess, Visitor},
@@ -47,33 +47,56 @@ where
         where
             S: SeqAccess<'de>,
         {
-            let mut cur_year = "2013".to_string();
-            let mut writer = new_file(&cur_year);
+            let mut done = HashSet::new();
+            let mut current: Option<(String, BufWriter<File>)> = None;
+            // let mut cur_year = "2013".to_string();
+            // let mut writer = new_file(&cur_year);
 
             let mut result = Vec::new();
             while let Some(l) = seq.next_element::<Location>()? {
-                let year = &l.timestamp[..4];
-                if year != "2013" && year != "2014" {
+                let year_month = &l.timestamp[..7];
+                if ! year_month.starts_with("2013") && ! year_month.starts_with("2014") {
                     continue;
                 }
-                if year != cur_year {
-                    end_file(writer);
-                    cur_year = year.to_string();
-                    writer = new_file(&year);
-                }
 
-                write!(&mut writer, r#"<Placemark>"#).unwrap();
-                write!(&mut writer, r#"<TimeStamp><when>{}</when></TimeStamp>"#, l.timestamp).unwrap();
-                write!(&mut writer, r#"<Point><coordinates>{},{}</coordinates></Point>"#, l.longitude_e7 as f64 / 10000000.0, l.latitude_e7 as f64 / 10000000.0).unwrap();
-                write!(&mut writer, r#"<ExtendedData><Data name="activeFlag"><value>true</value></Data></ExtendedData></Placemark>"#).unwrap();
-                // writeln!(&mut writer, "{}\t{},{}", l.timestamp, l.longitude_e7 as f64 / 10000000.0, l.latitude_e7 as f64 / 10000000.0).unwrap();
+                current = match current {
+                    None => {
+                        let writer = new_file(&year_month, &mut done);
+                        Some((year_month.to_owned(), writer))
+                    },
+                    Some((cur_year_month, cur_writer)) => {
+                        if year_month == cur_year_month {
+                            Some((cur_year_month, cur_writer))
+                        } else {
+                            end_file(cur_writer);
+                            let writer = new_file(&year_month, &mut done);
+                            Some((year_month.to_owned(), writer))
+                        }
+                    },
+                };
+
+                match current {
+                    None => panic!("current file not found: {}", year_month),
+                    Some((_, ref mut writer)) => {
+                        write!(writer, r#"<Placemark>"#).unwrap();
+                        write!(writer, r#"<TimeStamp><when>{}</when></TimeStamp>"#, l.timestamp).unwrap();
+                        write!(writer, r#"<Point><coordinates>{},{}</coordinates></Point>"#, l.longitude_e7 as f64 / 10000000.0, l.latitude_e7 as f64 / 10000000.0).unwrap();
+                        write!(writer, r#"<ExtendedData><Data name="activeFlag"><value>true</value></Data></ExtendedData></Placemark>"#).unwrap();
+                        write!(writer, "\n").unwrap();
+                        // writeln!(&mut writer, "{}\t{},{}", l.timestamp, l.longitude_e7 as f64 / 10000000.0, l.latitude_e7 as f64 / 10000000.0).unwrap();
+                    },
+                };
 
                 if result.len() >= 1000 {
                     continue;
                 }
                 result.push(l);
             }
-            end_file(writer);
+
+            match current {
+                None => println!("no locations found"),
+                Some((_, writer)) => end_file(writer)
+            };
 
             Ok(result)
         }
@@ -86,8 +109,13 @@ where
     deserializer.deserialize_seq(visitor)
 }
 
-fn new_file (year: &str) -> BufWriter<File> {
-    let path = format!("{}.kml", year);
+fn new_file (year_month: &str, done: &mut HashSet<String>) -> BufWriter<File> {
+    if done.contains(year_month) {
+        panic!("Has already opened {}", year_month);
+    }
+    done.insert(year_month.to_owned());
+
+    let path = format!("output/{}.kml", year_month);
     let file = File::create(path).unwrap();
     let mut writer = BufWriter::new(file);
 
@@ -95,6 +123,7 @@ fn new_file (year: &str) -> BufWriter<File> {
     write!(&mut writer, r#"<kml xmlns="http://earth.google.com/kml/2.2">"#).unwrap();
     write!(&mut writer, r#"<Document>"#).unwrap();
     write!(&mut writer, r#"<name>1log location logs</name>"#).unwrap();
+    write!(writer, "\n").unwrap();
 
     writer
 }
@@ -102,4 +131,5 @@ fn new_file (year: &str) -> BufWriter<File> {
 fn end_file (mut writer: BufWriter<File>) {
     write!(&mut writer, r#"</Document>"#).unwrap();
     write!(&mut writer, r#"</kml>"#).unwrap();
+    write!(writer, "\n").unwrap();
 }

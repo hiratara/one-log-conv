@@ -1,4 +1,4 @@
-use std::{cmp, fmt, fs::File, io::BufReader, marker::PhantomData};
+use std::{cmp, fmt, fs::File, io::{BufReader, BufWriter, Write}, marker::PhantomData};
 
 use serde::{
     de::{self, SeqAccess, Visitor},
@@ -23,9 +23,9 @@ struct Records {
 #[derive(Debug, Deserialize)]
 struct Location {
     #[serde(rename(deserialize = "latitudeE7"))]
-    latitude_e7: u32,
+    latitude_e7: i32,
     #[serde(rename(deserialize = "longitudeE7"))]
-    longitude_e7: u32,
+    longitude_e7: i32,
     timestamp: String,
 }
 
@@ -47,9 +47,24 @@ where
         where
             S: SeqAccess<'de>,
         {
+            let mut cur_year = "2013".to_string();
+            let mut writer = BufWriter::new(File::create("2013.tsv").unwrap());
+
             let mut result = Vec::new();
             while let Some(l) = seq.next_element::<Location>()? {
-                if result.len() >= 10 {
+                let year = &l.timestamp[..4];
+                if year != "2013" && year != "2014" {
+                    continue;
+                }
+                if year != cur_year {
+                    let new_path = format!("{}.tsv", year);
+                    writer = BufWriter::new(File::create(new_path).unwrap());
+                    cur_year = year.to_string();
+                }
+
+                writeln!(&mut writer, "{}\t{},{}", l.timestamp, l.longitude_e7 as f64 / 10000000.0, l.latitude_e7 as f64 / 10000000.0).unwrap();
+
+                if result.len() >= 1000 {
                     continue;
                 }
                 result.push(l);

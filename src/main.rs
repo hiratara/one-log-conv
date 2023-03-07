@@ -1,14 +1,13 @@
 use std::{
-    cmp,
     collections::HashSet,
     fmt,
     fs::File,
     io::{BufReader, BufWriter, Write},
-    marker::PhantomData, path::PathBuf, str::FromStr,
+    path::PathBuf, str::FromStr,
 };
 
 use serde::{
-    de::{self, SeqAccess, Visitor},
+    de::{SeqAccess, Visitor},
     Deserialize, Deserializer,
 };
 

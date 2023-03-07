@@ -3,7 +3,8 @@ use std::{
     fmt,
     fs::File,
     io::{BufReader, BufWriter, Write},
-    path::PathBuf, str::FromStr,
+    path::PathBuf,
+    str::FromStr,
 };
 
 use serde::{
@@ -146,10 +147,20 @@ fn new_file(year_month: &str, done: &mut HashSet<String>) -> (BufWriter<File>, C
     write!(&mut writer, r#"<name>1log location logs</name>"#).unwrap();
     write!(writer, "\n").unwrap();
 
-    (writer, ConversionResult{path: PathBuf::from_str(&path).unwrap(), count:0})
+    (
+        writer,
+        ConversionResult {
+            path: PathBuf::from_str(&path).unwrap(),
+            count: 0,
+        },
+    )
 }
 
-fn end_file(mut writer: BufWriter<File>, result: ConversionResult, results: &mut Vec<ConversionResult>) {
+fn end_file(
+    mut writer: BufWriter<File>,
+    result: ConversionResult,
+    results: &mut Vec<ConversionResult>,
+) {
     write!(&mut writer, r#"</Document>"#).unwrap();
     write!(&mut writer, r#"</kml>"#).unwrap();
     write!(writer, "\n").unwrap();

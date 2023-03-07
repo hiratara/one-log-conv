@@ -19,8 +19,6 @@ fn main() {
     println!("{:?}", v);
 }
 
-// TODO: without buffering https://serde.rs/stream-array.html
-
 #[derive(Debug, Deserialize)]
 struct Records {
     #[serde(deserialize_with = "deserialize_locations")]
